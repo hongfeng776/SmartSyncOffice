@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -20,7 +21,13 @@ public class SysUser {
     private String avatar;
     private Long deptId;
     private Integer status;
+
+    private Integer loginFailCount;
+    private LocalDateTime lockTime;
     private LocalDateTime lastLoginTime;
+    private String lastLoginIp;
+    private String lastLoginLocation;
+
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private Integer isDeleted;

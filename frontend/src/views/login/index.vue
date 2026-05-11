@@ -43,6 +43,24 @@
             @keyup.enter="handleLogin"
           />
         </el-form-item>
+        
+        <el-form-item v-if="showCaptcha" prop="captchaCode">
+          <div class="captcha-row">
+            <el-input
+              v-model="loginForm.captchaCode"
+              placeholder="请输入验证码"
+              prefix-icon="Picture"
+              :size="isMobile ? 'default' : 'large'"
+              class="captcha-input"
+              maxlength="4"
+            />
+            <div class="captcha-image" @click="refreshCaptcha" title="点击刷新">
+              <img v-if="captchaInfo.captchaImage" :src="captchaInfo.captchaImage" alt="验证码" />
+              <span v-else class="refresh-loading">加载中...</span>
+            </div>
+          </div>
+        </el-form-item>
+        
         <el-form-item>
           <div class="login-options">
             <el-checkbox v-model="loginForm.rememberMe">
@@ -58,10 +76,16 @@
             type="primary"
             :size="isMobile ? 'default' : 'large'"
             :loading="loading"
+            :disabled="isLocked"
             class="login-btn"
             @click="handleLogin"
           >
-            <span v-if="!loading">登 录</span>
+            <span v-if="!loading">
+              <template v-if="isLocked">
+                账号已锁定 ({{ lockCountdown }}s后解锁)
+              </template>
+              <template v-else>登 录</template>
+            </span>
             <span v-else>登录中...</span>
           </el-button>
         </el-form-item>
@@ -85,34 +109,107 @@
         <span class="copyright">© 2024 SmartSyncOffice 智能办公系统</span>
       </div>
     </div>
+    
+    <el-dialog
+      v-model="showDifferentLocationDialog"
+      title="异地登录提醒"
+      width="480px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      @close="cancelLogin"
+    >
+      <div class="different-location-content">
+        <el-alert
+          title="检测到异地登录"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 16px"
+        >
+          为确保账户安全，我们检测到您当前登录地点与上次不同
+        </el-alert>
+        
+        <el-descriptions :column="1" border size="small">
+          <el-descriptions-item label="上次登录IP">
+            {{ differentLocationInfo.lastLoginIp }}
+          </el-descriptions-item>
+          <el-descriptions-item label="上次登录时间">
+            {{ differentLocationInfo.lastLoginTime }}
+          </el-descriptions-item>
+          <el-descriptions-item label="当前登录IP">
+            {{ differentLocationInfo.currentLoginIp }}
+          </el-descriptions-item>
+        </el-descriptions>
+        
+        <div class="security-tips" style="margin-top: 16px">
+          <el-icon><Warning /></el-icon>
+          <span>如果不是您本人操作，请立即修改密码并检查账户安全</span>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="cancelLogin">取消登录</el-button>
+        <el-button type="primary" @click="confirmLogin">
+          <el-icon><Lock /></el-icon>
+          确认登录
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/modules/user'
+import request from '@/utils/request'
+import { login as apiLogin } from '@/api/auth'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const loginFormRef = ref(null)
 const loading = ref(false)
 const isMobile = ref(false)
+const showCaptcha = ref(false)
+const showDifferentLocationDialog = ref(false)
+const differentLocationInfo = ref({
+  lastLoginIp: '',
+  lastLoginTime: '',
+  currentLoginIp: ''
+})
+const differentLocationData = ref(null)
+
+const isLocked = ref(false)
+const lockCountdown = ref(0)
+let lockTimer = null
 let resizeTimer = null
+
+const captchaInfo = reactive({
+  captchaKey: '',
+  captchaImage: ''
+})
 
 const loginForm = reactive({
   username: '',
   password: '',
+  captchaCode: '',
+  captchaKey: '',
   rememberMe: false,
   autoLogin: false
 })
 
 const loginRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  captchaCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
 }
+
+const captchaRequired = computed(() => {
+  return showCaptcha.value ? loginForm.captchaCode && loginForm.captchaKey : true
+})
 
 function checkMobile() {
   isMobile.value = window.innerWidth < 768
@@ -121,6 +218,18 @@ function checkMobile() {
 function handleResize() {
   if (resizeTimer) clearTimeout(resizeTimer)
   resizeTimer = setTimeout(checkMobile, 100)
+}
+
+async function refreshCaptcha() {
+  try {
+    const res = await request.get('/api/captcha/generate')
+    captchaInfo.captchaKey = res.data.captchaKey
+    captchaInfo.captchaImage = res.data.captchaImage
+    loginForm.captchaKey = res.data.captchaKey
+    loginForm.captchaCode = ''
+  } catch (error) {
+    console.error('获取验证码失败:', error)
+  }
 }
 
 function loadRememberedInfo() {
@@ -152,23 +261,104 @@ function handleAutoLogin() {
   }
 }
 
+function startLockCountdown(minutes) {
+  isLocked.value = true
+  lockCountdown.value = minutes * 60
+  lockTimer = setInterval(() => {
+    lockCountdown.value--
+    if (lockCountdown.value <= 0) {
+      clearInterval(lockTimer)
+      isLocked.value = false
+    }
+  }, 1000)
+}
+
 async function handleLogin() {
   const valid = await loginFormRef.value.validate().catch(() => false)
   if (!valid) return
 
   loading.value = true
   try {
-    await userStore.login(loginForm)
+    const loginParams = {
+      username: loginForm.username,
+      password: loginForm.password
+    }
+    
+    if (showCaptcha.value) {
+      loginParams.captchaCode = loginForm.captchaCode
+      loginParams.captchaKey = loginForm.captchaKey
+    }
+    
+    const res = await apiLogin(loginParams)
+    
+    if (res.data.differentLocation) {
+      differentLocationInfo.value = {
+        lastLoginIp: res.data.lastLoginIp || '未知',
+        lastLoginTime: res.data.lastLoginTime || '首次登录',
+        currentLoginIp: res.data.currentLoginIp || '未知'
+      }
+      differentLocationData.value = res.data
+      showDifferentLocationDialog.value = true
+      loading.value = false
+      return
+    }
+    
+    completeLogin(res)
+  } catch (error) {
+    console.error('登录失败:', error)
+    const errorCode = error?.response?.data?.code
+    const errorMsg = error?.response?.data?.message || '登录失败'
+    
+    if (errorCode === 1006 || errorCode === 1007) {
+      showCaptcha.value = true
+      refreshCaptcha()
+    } else if (errorCode === 1008) {
+      const match = errorMsg.match(/(\d+)分钟后重试/)
+      if (match) {
+        startLockCountdown(parseInt(match[1]))
+      }
+    } else if (errorCode === 1002) {
+      if (!showCaptcha.value) {
+        showCaptcha.value = true
+        refreshCaptcha()
+      }
+    }
+    
+    ElMessage.error(errorMsg)
+  } finally {
+    if (!showDifferentLocationDialog.value) {
+      loading.value = false
+    }
+  }
+}
+
+function completeLogin(res) {
+  userStore.token = res.data.token
+  userStore.menus = []
+  ElMessage.success('登录成功')
+  handleRememberedInfo()
+  handleAutoLogin()
+  const redirect = router.currentRoute.value.query.redirect || '/'
+  router.push(redirect)
+}
+
+function confirmLogin() {
+  if (differentLocationData.value) {
+    userStore.token = differentLocationData.value.token
+    userStore.menus = []
     ElMessage.success('登录成功')
     handleRememberedInfo()
     handleAutoLogin()
+    showDifferentLocationDialog.value = false
     const redirect = router.currentRoute.value.query.redirect || '/'
     router.push(redirect)
-  } catch (error) {
-    console.error('登录失败:', error)
-  } finally {
-    loading.value = false
   }
+}
+
+function cancelLogin() {
+  showDifferentLocationDialog.value = false
+  userStore.resetState()
+  loading.value = false
 }
 
 onMounted(() => {
@@ -179,6 +369,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (resizeTimer) clearTimeout(resizeTimer)
+  if (lockTimer) clearInterval(lockTimer)
   window.removeEventListener('resize', handleResize)
 })
 </script>
@@ -304,6 +495,47 @@ onUnmounted(() => {
   margin-bottom: 20px;
 }
 
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  
+  .captcha-input {
+    flex: 1;
+  }
+  
+  .captcha-image {
+    width: 120px;
+    height: 40px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid #dcdfe6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    transition: all 0.3s;
+    
+    &:hover {
+      border-color: #409eff;
+      box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
+    }
+    
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .refresh-loading {
+      font-size: 12px;
+      color: #909399;
+    }
+  }
+}
+
 .login-options {
   display: flex;
   justify-content: space-between;
@@ -324,7 +556,7 @@ onUnmounted(() => {
   letter-spacing: 2px;
   transition: all 0.3s ease;
 
-  &:hover {
+  &:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
   }
@@ -352,6 +584,23 @@ onUnmounted(() => {
   .copyright {
     font-size: 12px;
     color: #909399;
+  }
+}
+
+.different-location-content {
+  .security-tips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: #fef0f0;
+    border-radius: 4px;
+    color: #f56c6c;
+    font-size: 13px;
+    
+    .el-icon {
+      font-size: 18px;
+    }
   }
 }
 
@@ -394,6 +643,13 @@ onUnmounted(() => {
   .login-options {
     flex-direction: column;
     gap: 8px;
+  }
+
+  .captcha-row {
+    .captcha-image {
+      width: 100px;
+      height: 36px;
+    }
   }
 }
 </style>

@@ -20,8 +20,14 @@ public enum ResultCode {
     TOKEN_INVALID(1004, "Token无效"),
     TOKEN_EXPIRED(1005, "Token已过期"),
     
+    CAPTCHA_ERROR(1006, "验证码错误或已过期"),
+    CAPTCHA_EXPIRED(1007, "验证码已过期"),
+    ACCOUNT_LOCKED(1008, "账号已被锁定，请稍后重试"),
+    
     USERNAME_EXISTS(1010, "用户名已存在"),
-    ROLE_NOT_EXIST(1020, "角色不存在");
+    ROLE_NOT_EXIST(1020, "角色不存在"),
+    
+    DIFFERENT_LOCATION_LOGIN(2001, "异地登录");
 
     private final Integer code;
     private final String message;

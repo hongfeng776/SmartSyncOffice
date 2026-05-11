@@ -45,7 +45,11 @@ CREATE TABLE IF NOT EXISTS sys_user (
     avatar VARCHAR(255) COMMENT '头像URL',
     dept_id BIGINT COMMENT '部门ID',
     status TINYINT DEFAULT 1 COMMENT '状态 1:启用 0:禁用',
+    login_fail_count INT DEFAULT 0 COMMENT '登录失败次数',
+    lock_time DATETIME COMMENT '账号锁定时间',
     last_login_time DATETIME COMMENT '最后登录时间',
+    last_login_ip VARCHAR(50) COMMENT '最后登录IP',
+    last_login_location VARCHAR(100) COMMENT '最后登录位置',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     is_deleted TINYINT DEFAULT 0 COMMENT '逻辑删除 0:未删除 1:已删除'
