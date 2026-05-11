@@ -1,0 +1,26 @@
+# Java
+target/
+*.class
+*.jar
+*.log
+.idea/
+*.iml
+.vscode/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env.local
+.env.*.local

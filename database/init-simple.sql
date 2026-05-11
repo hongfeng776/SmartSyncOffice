@@ -1,0 +1,110 @@
+-- SmartSyncOffice 简化版数据库初始化脚本
+-- 执行此脚本后，启动后端会自动创建测试用户并设置密码为 123456
+
+CREATE DATABASE IF NOT EXISTS smart_sync_office DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE smart_sync_office;
+
+-- 角色表
+CREATE TABLE IF NOT EXISTS sys_role (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '角色ID',
+    role_name VARCHAR(50) NOT NULL COMMENT '角色名称',
+    role_code VARCHAR(50) NOT NULL UNIQUE COMMENT '角色编码',
+    description VARCHAR(200) COMMENT '角色描述',
+    status TINYINT DEFAULT 1 COMMENT '状态 1:启用 0:禁用',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_deleted TINYINT DEFAULT 0 COMMENT '逻辑删除 0:未删除 1:已删除'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色表';
+
+-- 权限表
+CREATE TABLE IF NOT EXISTS sys_permission (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '权限ID',
+    permission_name VARCHAR(100) NOT NULL COMMENT '权限名称',
+    permission_code VARCHAR(100) NOT NULL UNIQUE COMMENT '权限编码',
+    resource_type VARCHAR(20) DEFAULT 'menu' COMMENT '资源类型 menu:菜单 button:按钮',
+    parent_id BIGINT DEFAULT 0 COMMENT '父级权限ID',
+    path VARCHAR(200) COMMENT '路由路径',
+    component VARCHAR(200) COMMENT '组件路径',
+    icon VARCHAR(50) COMMENT '图标',
+    sort_order INT DEFAULT 0 COMMENT '排序',
+    status TINYINT DEFAULT 1 COMMENT '状态 1:启用 0:禁用',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_deleted TINYINT DEFAULT 0 COMMENT '逻辑删除 0:未删除 1:已删除'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='权限表';
+
+-- 用户表
+CREATE TABLE IF NOT EXISTS sys_user (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
+    password VARCHAR(200) NOT NULL COMMENT '密码',
+    real_name VARCHAR(50) COMMENT '真实姓名',
+    email VARCHAR(100) COMMENT '邮箱',
+    phone VARCHAR(20) COMMENT '手机号',
+    avatar VARCHAR(255) COMMENT '头像URL',
+    dept_id BIGINT COMMENT '部门ID',
+    status TINYINT DEFAULT 1 COMMENT '状态 1:启用 0:禁用',
+    last_login_time DATETIME COMMENT '最后登录时间',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_deleted TINYINT DEFAULT 0 COMMENT '逻辑删除 0:未删除 1:已删除'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
+-- 用户角色关联表
+CREATE TABLE IF NOT EXISTS sys_user_role (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+    role_id BIGINT NOT NULL COMMENT '角色ID',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_user_role (user_id, role_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户角色关联表';
+
+-- 角色权限关联表
+CREATE TABLE IF NOT EXISTS sys_role_permission (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'ID',
+    role_id BIGINT NOT NULL COMMENT '角色ID',
+    permission_id BIGINT NOT NULL COMMENT '权限ID',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY uk_role_permission (role_id, permission_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色权限关联表';
+
+-- 清空表数据
+DELETE FROM sys_role_permission;
+DELETE FROM sys_user_role;
+DELETE FROM sys_permission;
+DELETE FROM sys_role;
+DELETE FROM sys_user;
+
+-- 重置自增ID
+ALTER TABLE sys_user AUTO_INCREMENT = 1;
+ALTER TABLE sys_role AUTO_INCREMENT = 1;
+ALTER TABLE sys_permission AUTO_INCREMENT = 1;
+ALTER TABLE sys_user_role AUTO_INCREMENT = 1;
+ALTER TABLE sys_role_permission AUTO_INCREMENT = 1;
+
+-- 插入角色
+INSERT INTO sys_role (id, role_name, role_code, description) VALUES
+(1, '超级管理员', 'ADMIN', '系统最高权限管理员'),
+(2, '普通员工', 'EMPLOYEE', '普通员工权限');
+
+-- 插入权限
+INSERT INTO sys_permission (id, permission_name, permission_code, resource_type, parent_id, path, component, icon, sort_order) VALUES
+(1, '系统首页', 'dashboard', 'menu', 0, '/dashboard', 'dashboard/index', 'HomeFilled', 1),
+(2, '系统管理', 'system', 'menu', 0, '/system', '', 'Setting', 2),
+(3, '用户管理', 'system:user', 'menu', 2, '/system/user', 'system/user/index', 'User', 1),
+(4, '角色管理', 'system:role', 'menu', 2, '/system/role', 'system/role/index', 'UserFilled', 2),
+(5, '权限管理', 'system:permission', 'menu', 2, '/system/permission', 'system/permission/index', 'Lock', 3),
+(6, '个人中心', 'profile', 'menu', 0, '/profile', 'profile/index', 'User', 99),
+(7, '待办事项', 'todo', 'menu', 0, '/todo', 'todo/index', 'TodoList', 3),
+(8, '文件管理', 'file', 'menu', 0, '/file', 'file/index', 'Folder', 4);
+
+-- 用户角色关联
+INSERT INTO sys_user_role (user_id, role_id) VALUES
+(1, 1),
+(2, 2);
+
+-- 角色权限关联
+INSERT INTO sys_role_permission (role_id, permission_id) VALUES
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8),
+(2, 1), (2, 6), (2, 7), (2, 8);
