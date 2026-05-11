@@ -159,12 +159,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/modules/user'
-import request from '@/utils/request'
-import { login as apiLogin } from '@/api/auth'
+import axios from 'axios'
+import { login as apiLogin, getUserInfo } from '@/api/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -207,10 +207,6 @@ const loginRules = {
   captchaCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
 }
 
-const captchaRequired = computed(() => {
-  return showCaptcha.value ? loginForm.captchaCode && loginForm.captchaKey : true
-})
-
 function checkMobile() {
   isMobile.value = window.innerWidth < 768
 }
@@ -222,13 +218,16 @@ function handleResize() {
 
 async function refreshCaptcha() {
   try {
-    const res = await request.get('/api/captcha/generate')
-    captchaInfo.captchaKey = res.data.captchaKey
-    captchaInfo.captchaImage = res.data.captchaImage
-    loginForm.captchaKey = res.data.captchaKey
-    loginForm.captchaCode = ''
+    const res = await axios.get('/api/captcha/generate')
+    if (res.data && res.data.code === 200) {
+      captchaInfo.captchaKey = res.data.data.captchaKey
+      captchaInfo.captchaImage = res.data.data.captchaImage
+      loginForm.captchaKey = res.data.data.captchaKey
+      loginForm.captchaCode = ''
+    }
   } catch (error) {
     console.error('获取验证码失败:', error)
+    ElMessage.error('获取验证码失败，请重试')
   }
 }
 
@@ -303,7 +302,7 @@ async function handleLogin() {
       return
     }
     
-    completeLogin(res)
+    await completeLogin(res)
   } catch (error) {
     console.error('登录失败:', error)
     const errorCode = error?.response?.data?.code
@@ -323,8 +322,6 @@ async function handleLogin() {
         refreshCaptcha()
       }
     }
-    
-    ElMessage.error(errorMsg)
   } finally {
     if (!showDifferentLocationDialog.value) {
       loading.value = false
@@ -332,26 +329,51 @@ async function handleLogin() {
   }
 }
 
-function completeLogin(res) {
+async function completeLogin(res) {
   userStore.token = res.data.token
   userStore.menus = []
-  ElMessage.success('登录成功')
-  handleRememberedInfo()
-  handleAutoLogin()
-  const redirect = router.currentRoute.value.query.redirect || '/'
-  router.push(redirect)
-}
-
-function confirmLogin() {
-  if (differentLocationData.value) {
-    userStore.token = differentLocationData.value.token
-    userStore.menus = []
+  userStore.userInfo = null
+  
+  try {
+    await userStore.getUserInfo()
     ElMessage.success('登录成功')
     handleRememberedInfo()
     handleAutoLogin()
-    showDifferentLocationDialog.value = false
+    
     const redirect = router.currentRoute.value.query.redirect || '/'
     router.push(redirect)
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    userStore.resetState()
+    ElMessage.error('获取用户信息失败')
+  }
+}
+
+async function confirmLogin() {
+  if (differentLocationData.value) {
+    showDifferentLocationDialog.value = false
+    loading.value = true
+    
+    try {
+      userStore.token = differentLocationData.value.token
+      userStore.menus = []
+      userStore.userInfo = null
+      
+      await userStore.getUserInfo()
+      
+      ElMessage.success('登录成功')
+      handleRememberedInfo()
+      handleAutoLogin()
+      
+      const redirect = router.currentRoute.value.query.redirect || '/'
+      router.push(redirect)
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+      userStore.resetState()
+      ElMessage.error('获取用户信息失败')
+    } finally {
+      loading.value = false
+    }
   }
 }
 
@@ -377,17 +399,19 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .login-container {
   width: 100%;
-  height: 100vh;
+  min-height: 100vh;
+  height: auto;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   justify-content: center;
   align-items: center;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
+  padding: 20px 0;
 }
 
 .login-bg {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
@@ -451,12 +475,22 @@ onUnmounted(() => {
   position: relative;
   z-index: 10;
   backdrop-filter: blur(10px);
+  box-sizing: border-box;
 }
 
-.login-box-mobile {
-  width: 90%;
-  max-width: 360px;
-  padding: 30px 20px;
+@media screen and (max-width: 768px) {
+  .login-box {
+    width: 90%;
+    max-width: 360px;
+    padding: 30px 20px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .login-box {
+    width: 95%;
+    padding: 20px 16px;
+  }
 }
 
 .login-header {
@@ -475,18 +509,24 @@ onUnmounted(() => {
     letter-spacing: 1px;
   }
 
-  .title-mobile {
-    font-size: 22px;
-  }
-
   .subtitle {
     font-size: 14px;
     color: #909399;
     margin: 0;
     font-weight: 400;
   }
+}
 
-  .subtitle-mobile {
+@media screen and (max-width: 768px) {
+  .login-header {
+    margin-bottom: 20px;
+  }
+  
+  .login-header .title {
+    font-size: 22px;
+  }
+  
+  .login-header .subtitle {
     font-size: 12px;
   }
 }
@@ -503,6 +543,7 @@ onUnmounted(() => {
   
   .captcha-input {
     flex: 1;
+    min-width: 0;
   }
   
   .captcha-image {
@@ -517,6 +558,7 @@ onUnmounted(() => {
     justify-content: center;
     background: #fff;
     transition: all 0.3s;
+    flex-shrink: 0;
     
     &:hover {
       border-color: #409eff;
@@ -536,6 +578,13 @@ onUnmounted(() => {
   }
 }
 
+@media screen and (max-width: 480px) {
+  .captcha-row .captcha-image {
+    width: 100px;
+    height: 36px;
+  }
+}
+
 .login-options {
   display: flex;
   justify-content: space-between;
@@ -544,6 +593,14 @@ onUnmounted(() => {
   .checkbox-text {
     font-size: 13px;
     color: #606266;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .login-options {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
   }
 }
 
@@ -604,17 +661,17 @@ onUnmounted(() => {
   }
 }
 
-@media screen and (max-height: 600px) {
+@media screen and (max-height: 650px) {
   .login-header {
     margin-bottom: 16px;
+  }
 
-    .title {
-      font-size: 22px;
-    }
+  .login-header .title {
+    font-size: 22px;
+  }
 
-    .subtitle {
-      display: none;
-    }
+  .login-header .subtitle {
+    display: none;
   }
 
   .login-box {
@@ -627,29 +684,6 @@ onUnmounted(() => {
 
   .login-footer {
     display: none;
-  }
-}
-
-@media screen and (max-width: 480px) {
-  .login-box {
-    width: 95%;
-    padding: 20px 16px;
-  }
-
-  .login-header {
-    margin-bottom: 20px;
-  }
-
-  .login-options {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .captcha-row {
-    .captcha-image {
-      width: 100px;
-      height: 36px;
-    }
   }
 }
 </style>

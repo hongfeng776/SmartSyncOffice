@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -41,52 +42,74 @@ public class AuthService {
         "^(127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|0:0:0:0:0:0:0:1|::1)"
     );
 
+    @Transactional
     public Map<String, Object> login(LoginDTO loginDTO, HttpServletRequest request) {
+        log.info("开始登录请求: username={}", loginDTO.getUsername());
+        
         SysUser user = userMapper.selectOne(
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, loginDTO.getUsername())
         );
 
         String ipAddress = getClientIp(request);
+        log.info("登录IP地址: {}", ipAddress);
 
         if (user == null) {
+            log.warn("用户不存在: username={}", loginDTO.getUsername());
             loginLogService.saveLoginLog(request, null, null, false, "用户不存在");
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
         }
 
+        log.info("查询到用户: id={}, username={}, loginFailCount={}, lockTime={}", 
+            user.getId(), user.getUsername(), user.getLoginFailCount(), user.getLockTime());
+
         if (isAccountLocked(user)) {
             long remainingMinutes = getRemainingLockMinutes(user);
+            log.warn("账号已锁定: username={}, 剩余解锁时间={}分钟", user.getUsername(), remainingMinutes);
             loginLogService.saveLoginLog(request, user, null, false, "账号已锁定");
             throw new BusinessException(ResultCode.ACCOUNT_LOCKED.getCode(), 
                 "账号已被锁定，请在" + remainingMinutes + "分钟后重试");
         }
 
         if (user.getStatus() == 0) {
+            log.warn("用户已禁用: username={}", user.getUsername());
             loginLogService.saveLoginLog(request, user, null, false, "用户已禁用");
             throw new BusinessException(ResultCode.USER_DISABLED);
         }
 
         if (shouldRequireCaptcha(user)) {
-            if (!captchaService.validateCaptcha(loginDTO.getCaptchaKey(), loginDTO.getCaptchaCode())) {
+            log.info("需要验证码验证: loginFailCount={}", user.getLoginFailCount());
+            boolean captchaValid = captchaService.validateCaptcha(loginDTO.getCaptchaKey(), loginDTO.getCaptchaCode());
+            log.info("验证码校验结果: {}", captchaValid);
+            
+            if (!captchaValid) {
                 incrementLoginFailCount(user);
                 loginLogService.saveLoginLog(request, user, null, false, "验证码错误");
                 throw new BusinessException(ResultCode.CAPTCHA_ERROR);
             }
         }
 
-        if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
+        boolean passwordMatch = passwordEncoder.matches(loginDTO.getPassword(), user.getPassword());
+        log.info("密码校验结果: {}", passwordMatch);
+        
+        if (!passwordMatch) {
             incrementLoginFailCount(user);
             
-            int remainingAttempts = maxFailCount - (user.getLoginFailCount() != null ? user.getLoginFailCount() : 0);
+            int currentFailCount = user.getLoginFailCount() != null ? user.getLoginFailCount() : 0;
+            int remainingAttempts = maxFailCount - currentFailCount;
             String failureReason = "密码错误";
             if (remainingAttempts > 0 && remainingAttempts <= 2) {
                 failureReason = "密码错误，剩余" + remainingAttempts + "次尝试机会";
             }
+            
+            log.warn("密码错误: username={}, 当前失败次数={}, 剩余尝试次数={}", 
+                user.getUsername(), currentFailCount, remainingAttempts);
             
             loginLogService.saveLoginLog(request, user, null, false, failureReason);
             throw new BusinessException(ResultCode.PASSWORD_ERROR);
         }
 
         boolean differentLocation = checkDifferentLocation(user, ipAddress);
+        log.info("异地登录检测结果: {}", differentLocation);
 
         resetLoginFailCount(user);
 
@@ -96,6 +119,7 @@ public class AuthService {
         user.setLastLoginIp(ipAddress);
         user.setLastLoginLocation(getSimpleLocation(ipAddress));
         userMapper.updateById(user);
+        log.info("用户登录成功: username={}, token已生成", user.getUsername());
 
         loginLogService.saveLoginLog(request, user, token, true, null);
 
@@ -119,7 +143,11 @@ public class AuthService {
             return false;
         }
         LocalDateTime unlockTime = user.getLockTime().plusMinutes(lockDurationMinutes);
-        return LocalDateTime.now().isBefore(unlockTime);
+        boolean locked = LocalDateTime.now().isBefore(unlockTime);
+        if (locked) {
+            log.info("账号锁定状态检查: lockTime={}, unlockTime={}", user.getLockTime(), unlockTime);
+        }
+        return locked;
     }
 
     private long getRemainingLockMinutes(SysUser user) {
@@ -136,7 +164,8 @@ public class AuthService {
     }
 
     private boolean shouldRequireCaptcha(SysUser user) {
-        return user.getLoginFailCount() != null && user.getLoginFailCount() >= 3;
+        int failCount = user.getLoginFailCount() != null ? user.getLoginFailCount() : 0;
+        return failCount >= 3;
     }
 
     private void incrementLoginFailCount(SysUser user) {
@@ -145,26 +174,36 @@ public class AuthService {
         user.setLoginFailCount(failCount);
         user.setUpdateTime(LocalDateTime.now());
         
+        log.info("增加登录失败计数: username={}, failCount={}, maxFailCount={}", 
+            user.getUsername(), failCount, maxFailCount);
+        
         if (failCount >= maxFailCount) {
             user.setLockTime(LocalDateTime.now());
+            log.warn("账号已被锁定: username={}, lockTime={}", user.getUsername(), user.getLockTime());
         }
         
         userMapper.updateById(user);
+        log.info("用户状态已更新到数据库: id={}, failCount={}, lockTime={}", 
+            user.getId(), user.getLoginFailCount(), user.getLockTime());
     }
 
     private void resetLoginFailCount(SysUser user) {
         user.setLoginFailCount(0);
         user.setLockTime(null);
         user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
+        log.info("重置登录失败计数: username={}", user.getUsername());
     }
 
     private boolean checkDifferentLocation(SysUser user, String currentIp) {
         if (user.getLastLoginIp() == null) {
+            log.info("首次登录，不触发异地登录检测: username={}", user.getUsername());
             return false;
         }
         
         String lastIp = user.getLastLoginIp();
         if (lastIp.equals(currentIp)) {
+            log.info("IP相同，不触发异地登录: lastIp={}, currentIp={}", lastIp, currentIp);
             return false;
         }
         
@@ -172,10 +211,15 @@ public class AuthService {
         String currentIpSection = getIpSection(currentIp);
         
         if (isInternalIp(lastIp) && isInternalIp(currentIp)) {
+            log.info("都是内网IP，不触发异地登录: lastIp={}, currentIp={}", lastIp, currentIp);
             return false;
         }
         
-        return !lastIpSection.equals(currentIpSection);
+        boolean different = !lastIpSection.equals(currentIpSection);
+        log.info("IP网段比较: lastSection={}, currentSection={}, different={}", 
+            lastIpSection, currentIpSection, different);
+        
+        return different;
     }
 
     private boolean isInternalIp(String ip) {
