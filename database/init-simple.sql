@@ -108,3 +108,24 @@ INSERT INTO sys_user_role (user_id, role_id) VALUES
 INSERT INTO sys_role_permission (role_id, permission_id) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8),
 (2, 1), (2, 6), (2, 7), (2, 8);
+
+-- 登录日志表
+CREATE TABLE IF NOT EXISTS sys_login_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '日志ID',
+    user_id BIGINT COMMENT '用户ID',
+    username VARCHAR(50) COMMENT '用户名',
+    real_name VARCHAR(50) COMMENT '真实姓名',
+    ip_address VARCHAR(50) COMMENT 'IP地址',
+    ip_location VARCHAR(100) COMMENT 'IP归属地',
+    browser VARCHAR(100) COMMENT '浏览器',
+    operating_system VARCHAR(100) COMMENT '操作系统',
+    device_type VARCHAR(20) COMMENT '设备类型',
+    login_status TINYINT DEFAULT 1 COMMENT '登录状态 1:成功 0:失败',
+    failure_reason VARCHAR(200) COMMENT '失败原因',
+    login_time DATETIME COMMENT '登录时间',
+    token VARCHAR(255) COMMENT 'Token(截取前50位)',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX idx_user_id (user_id),
+    INDEX idx_username (username),
+    INDEX idx_login_time (login_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录日志表';

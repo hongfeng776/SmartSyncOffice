@@ -126,6 +126,27 @@ router.beforeEach(async (to, from, next) => {
     if (whiteList.includes(to.path)) {
       next()
     } else {
+      const autoLogin = localStorage.getItem('auto_login')
+      const remembered = localStorage.getItem('remembered_login')
+      
+      if (autoLogin === 'true' && remembered) {
+        try {
+          const info = JSON.parse(remembered)
+          if (info.username && info.password) {
+            await userStore.login({ username: info.username, password: info.password })
+            await userStore.getUserInfo()
+            const accessRoutes = filterAsyncRoutes(asyncRoutes, userStore.roles)
+            accessRoutes.forEach(route => {
+              router.addRoute(route)
+            })
+            next({ ...to, replace: true })
+            return
+          }
+        } catch (error) {
+          console.error('自动登录失败:', error)
+          localStorage.removeItem('auto_login')
+        }
+      }
       next({ path: '/login', query: { redirect: to.path } })
     }
   }

@@ -6,7 +6,8 @@ export const useUserStore = defineStore('user', {
     token: '',
     userInfo: null,
     roles: [],
-    permissions: []
+    permissions: [],
+    menus: []
   }),
 
   getters: {
@@ -20,6 +21,7 @@ export const useUserStore = defineStore('user', {
     async login(loginData) {
       const res = await login(loginData)
       this.token = res.data.token
+      this.menus = []
       return res
     },
 
@@ -29,6 +31,10 @@ export const useUserStore = defineStore('user', {
       this.roles = res.data.roles || []
       this.permissions = res.data.permissions || []
       return res
+    },
+
+    setMenus(menus) {
+      this.menus = menus
     },
 
     async logout() {
@@ -44,11 +50,12 @@ export const useUserStore = defineStore('user', {
       this.userInfo = null
       this.roles = []
       this.permissions = []
+      this.menus = []
     }
   },
 
   persist: {
     key: 'user-store',
-    paths: ['token', 'userInfo', 'roles', 'permissions']
+    paths: ['token', 'userInfo', 'roles', 'permissions', 'menus']
   }
 })

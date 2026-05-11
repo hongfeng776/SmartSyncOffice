@@ -22,7 +22,7 @@
       router
     >
       <sidebar-item
-        v-for="route in menus"
+        v-for="route in userStore.menus"
         :key="route.path"
         :item="route"
         :base-path="route.path"
@@ -32,11 +32,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import SidebarItem from './SidebarItem.vue'
 import { useAppStore } from '@/store/modules/app'
 import { useUserStore } from '@/store/modules/user'
+import request from '@/utils/request'
 
 const route = useRoute()
 const appStore = useAppStore()
@@ -44,40 +45,28 @@ const userStore = useUserStore()
 
 const activeMenu = computed(() => route.path)
 
-const constantMenus = [
+const defaultMenus = [
   {
     path: '/dashboard',
     name: 'Dashboard',
     meta: { title: '系统首页', icon: 'HomeFilled' }
-  }
-]
-
-const adminMenus = [
-  {
-    path: '/system',
-    name: 'System',
-    meta: { title: '系统管理', icon: 'Setting' },
-    children: [
-      { path: '/system/user', meta: { title: '用户管理', icon: 'User' } },
-      { path: '/system/role', meta: { title: '角色管理', icon: 'UserFilled' } },
-      { path: '/system/permission', meta: { title: '权限管理', icon: 'Lock' } }
-    ]
-  }
-]
-
-const commonMenus = [
+  },
   { path: '/todo', meta: { title: '待办事项', icon: 'TodoList' } },
   { path: '/file', meta: { title: '文件管理', icon: 'Folder' } },
   { path: '/profile', meta: { title: '个人中心', icon: 'User' } }
 ]
 
-const menus = computed(() => {
-  const menuList = [...constantMenus]
-  if (userStore.isAdmin) {
-    menuList.push(...adminMenus)
+onMounted(async () => {
+  if (userStore.token && userStore.menus.length === 0) {
+    try {
+      const res = await request.get('/api/user/menus')
+      if (res.data && res.data.length > 0) {
+        userStore.setMenus(res.data)
+      }
+    } catch (error) {
+      console.error('获取菜单失败:', error)
+    }
   }
-  menuList.push(...commonMenus)
-  return menuList
 })
 </script>
 

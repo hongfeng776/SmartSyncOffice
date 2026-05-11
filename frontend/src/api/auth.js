@@ -15,6 +15,13 @@ export function getUserInfo() {
   })
 }
 
+export function getUserMenus() {
+  return request({
+    url: '/api/user/menus',
+    method: 'get'
+  })
+}
+
 export function logout() {
   return request({
     url: '/api/logout',
