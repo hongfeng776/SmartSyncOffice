@@ -103,6 +103,18 @@ const asyncRoutes = [
     ]
   },
   {
+    path: '/notification',
+    component: () => import('@/layout/index.vue'),
+    children: [
+      {
+        path: '',
+        name: 'Notification',
+        component: () => import('@/views/notification/index.vue'),
+        meta: { title: '消息通知', icon: 'Bell' }
+      }
+    ]
+  },
+  {
     path: '/todo',
     component: () => import('@/layout/index.vue'),
     children: [
