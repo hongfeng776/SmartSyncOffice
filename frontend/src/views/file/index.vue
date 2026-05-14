@@ -1,91 +1,155 @@
 <template>
   <div class="file-container">
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header flex-between">
-          <span>文件管理</span>
-          <div class="header-actions">
-            <el-radio-group v-model="currentFileType" size="small" @change="handleTypeChange">
-              <el-radio-button label="">全部</el-radio-button>
-              <el-radio-button label="image">图片</el-radio-button>
-              <el-radio-button label="document">文档</el-radio-button>
-              <el-radio-button label="video">视频</el-radio-button>
-            </el-radio-group>
-            <el-button type="primary" :icon="Upload" @click="handleUploadClick">
-              上传文件
-            </el-button>
-          </div>
-        </div>
-      </template>
-
-      <div class="search-bar">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索文件名"
-          size="small"
-          style="width: 300px"
-          :prefix-icon="Search"
-          clearable
-          @keyup.enter="loadFileList"
-        />
-      </div>
-
-      <el-table :data="fileList" v-loading="loading" style="width: 100%">
-        <el-table-column prop="originalFilename" label="文件名" min-width="200">
-          <template #default="scope">
-            <div class="file-name-cell" @click="handlePreview(scope.row)">
-              <el-icon class="file-icon" :color="getFileIconColor(scope.row.fileType)">
-                <component :is="getFileIcon(scope.row.fileType)" />
-              </el-icon>
-              <span>{{ scope.row.originalFilename }}</span>
+    <el-row :gutter="20">
+      <el-col :span="6">
+        <el-card shadow="never" class="folder-card">
+          <template #header>
+            <div class="card-header flex-between">
+              <span>文件夹</span>
+              <el-button type="primary" :icon="Plus" size="small" circle @click="handleCreateFolder" />
             </div>
           </template>
-        </el-table-column>
-        <el-table-column prop="fileSize" label="大小" width="100" />
-        <el-table-column prop="fileType" label="类型" width="100">
-          <template #default="scope">
-            <el-tag :type="getFileTagType(scope.row.fileType)" size="small">
-              {{ getFileTypeText(scope.row.fileType) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="uploaderName" label="上传者" width="120" />
-        <el-table-column prop="downloadCount" label="下载次数" width="100" />
-        <el-table-column prop="createTime" label="上传时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="scope">
-            <el-button type="primary" link size="small" @click="handlePreview(scope.row)">
-              预览
-            </el-button>
-            <el-button type="success" link size="small" @click="handleDownload(scope.row)">
-              下载
-            </el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(scope.row)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
 
-      <div class="pagination">
-        <el-pagination
-          v-model:current-page="queryParams.pageNum"
-          v-model:page-size="queryParams.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="loadFileList"
-          @current-change="loadFileList"
-        />
-      </div>
-    </el-card>
+          <el-tree
+            ref="folderTreeRef"
+            :data="folderTree"
+            :props="treeProps"
+            node-key="id"
+            default-expand-all
+            highlight-current
+            :expand-on-click-node="false"
+            @node-click="handleFolderClick"
+          >
+            <template #default="{ node, data }">
+              <span class="custom-tree-node">
+                <el-icon class="folder-icon">
+                  <FolderOpened v-if="node.expanded" />
+                  <Folder v-else />
+                </el-icon>
+                <span class="folder-name">{{ node.label }}</span>
+                <span class="folder-actions">
+                  <el-dropdown trigger="click" @command="(command) => handleFolderAction(command, data)">
+                    <el-icon class="action-icon" :size="14"><MoreFilled /></el-icon>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="create">新建子文件夹</el-dropdown-item>
+                        <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </span>
+              </span>
+            </template>
+          </el-tree>
+        </el-card>
+      </el-col>
 
-    <el-dialog v-model="uploadDialogVisible" title="上传文件" width="600px">
+      <el-col :span="18">
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header flex-between">
+              <div class="header-left">
+                <el-breadcrumb separator="/">
+                  <el-breadcrumb-item :to="{ path: '/file' }" @click.native="goToRoot">
+                    <el-icon><FolderOpened /></el-icon>
+                    全部文件
+                  </el-breadcrumb-item>
+                  <el-breadcrumb-item v-if="currentFolder">
+                    {{ currentFolder.folderName }}
+                  </el-breadcrumb-item>
+                </el-breadcrumb>
+              </div>
+              <div class="header-actions">
+                <el-select v-model="queryParams.fileType" placeholder="按类型筛选" size="small" clearable style="width: 120px" @change="loadFileList">
+                  <el-option label="图片" value="image" />
+                  <el-option label="文档" value="document" />
+                  <el-option label="视频" value="video" />
+                  <el-option label="音频" value="audio" />
+                  <el-option label="其他" value="other" />
+                </el-select>
+                <el-button type="primary" :icon="Upload" @click="handleUploadClick">
+                  上传文件
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <div class="search-bar">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索文件名..."
+              size="small"
+              style="width: 300px"
+              :prefix-icon="Search"
+              clearable
+              @keyup.enter="loadFileList"
+            >
+              <template #append>
+                <el-button :icon="Search" @click="loadFileList" />
+              </template>
+            </el-input>
+            <span class="file-count">共 {{ total }} 个文件</span>
+          </div>
+
+          <el-table :data="fileList" v-loading="loading" style="width: 100%">
+            <el-table-column prop="originalFilename" label="文件名" min-width="250">
+              <template #default="scope">
+                <div class="file-name-cell" @click="handlePreview(scope.row)">
+                  <el-icon class="file-icon" :color="getFileIconColor(scope.row.fileType)">
+                    <component :is="getFileIcon(scope.row.fileType)" />
+                  </el-icon>
+                  <span class="file-name-text">{{ scope.row.originalFilename }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="fileSize" label="大小" width="100" />
+            <el-table-column prop="fileType" label="类型" width="100">
+              <template #default="scope">
+                <el-tag :type="getFileTagType(scope.row.fileType)" size="small">
+                  {{ getFileTypeText(scope.row.fileType) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="uploaderName" label="上传者" width="120" />
+            <el-table-column prop="downloadCount" label="下载次数" width="100" />
+            <el-table-column prop="createTime" label="上传时间" width="180" />
+            <el-table-column label="操作" width="180" fixed="right">
+              <template #default="scope">
+                <el-button type="primary" link size="small" @click="handlePreview(scope.row)">
+                  预览
+                </el-button>
+                <el-button type="success" link size="small" @click="handleDownload(scope.row)">
+                  下载
+                </el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteFile(scope.row)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="queryParams.pageNum"
+              v-model:page-size="queryParams.pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="total"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="loadFileList"
+              @current-change="loadFileList"
+            />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-dialog v-model="uploadDialogVisible" title="上传文件" width="600px" :close-on-click-modal="false">
       <el-upload
         ref="uploadRef"
         :auto-upload="false"
         :multiple="true"
-        :limit="10"
+        :limit="20"
         :on-change="handleFileChange"
         :on-remove="handleFileRemove"
         drag
@@ -96,33 +160,56 @@
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            支持图片、文档、视频等格式，单个文件最大500MB，超过10MB的文件将后台异步处理
+            支持批量上传，单个文件最大500MB，超过10MB的文件将后台异步处理
           </div>
         </template>
       </el-upload>
 
-      <div class="file-list" v-if="fileListToUpload.length > 0">
-        <div v-for="(file, index) in fileListToUpload" :key="index" class="file-item">
-          <span class="file-name">{{ file.name }}</span>
-          <el-progress
-            v-if="file.percentage !== undefined"
-            :percentage="file.percentage"
-            :status="file.status"
-            style="width: 200px"
-          />
-          <span class="file-size">{{ formatFileSize(file.size) }}</span>
+      <div class="file-list-container" v-if="fileListToUpload.length > 0">
+        <div v-for="(file, index) in fileListToUpload" :key="index" class="upload-file-item">
+          <div class="file-info">
+            <el-icon class="file-icon-small">
+              <component :is="getFileIconByName(file.name)" />
+            </el-icon>
+            <span class="file-name">{{ file.name }}</span>
+            <span class="file-size">{{ formatFileSize(file.size) }}</span>
+          </div>
+          <div class="progress-container" v-if="file.status !== 'success' && file.status !== 'exception'">
+            <el-progress
+              :percentage="file.percentage || 0"
+              :stroke-width="8"
+              :show-text="true"
+            />
+          </div>
+          <div class="status-container" v-else>
+            <el-tag v-if="file.status === 'success'" type="success" size="small">上传成功</el-tag>
+            <el-tag v-else-if="file.status === 'exception'" type="danger" size="small">上传失败</el-tag>
+            <el-tag v-else type="info" size="small">等待上传</el-tag>
+          </div>
         </div>
       </div>
 
       <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitUpload" :loading="uploading">
+        <el-button @click="uploadDialogVisible = false" :disabled="uploading">取消</el-button>
+        <el-button type="primary" @click="submitUpload" :loading="uploading" :disabled="fileListToUpload.length === 0">
           开始上传
         </el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="previewDialogVisible" title="文件预览" width="80%" top="5vh">
+    <el-dialog v-model="folderDialogVisible" :title="folderDialogTitle" width="400px">
+      <el-form ref="folderFormRef" :model="folderForm" :rules="folderRules" label-width="80px">
+        <el-form-item label="文件夹名称" prop="folderName">
+          <el-input v-model="folderForm.folderName" placeholder="请输入文件夹名称" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="folderDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveFolder">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="previewDialogVisible" title="文件预览" width="80%" top="5vh" :close-on-click-modal="false">
       <div class="preview-container">
         <template v-if="previewLoading">
           <div class="loading-preview">
@@ -164,7 +251,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, h } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import {
   Upload,
   Search,
@@ -172,8 +259,12 @@ import {
   Document,
   VideoCamera,
   FolderOpened,
+  Folder,
   UploadFilled,
-  Loading
+  Loading,
+  Plus,
+  MoreFilled,
+  Headset
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -182,45 +273,169 @@ import {
   downloadFile,
   deleteFile,
   getFileList,
-  getFilePreviewUrl
+  getFilePreviewUrl,
+  getFolderTree,
+  createFolder,
+  updateFolder,
+  deleteFolder
 } from '@/api/file'
 
 const uploadRef = ref(null)
+const folderTreeRef = ref(null)
+const folderFormRef = ref(null)
 const uploadDialogVisible = ref(false)
+const folderDialogVisible = ref(false)
 const previewDialogVisible = ref(false)
 const loading = ref(false)
 const uploading = ref(false)
 const previewLoading = ref(false)
 const fileList = ref([])
 const fileListToUpload = ref([])
+const folderTree = ref([])
 const searchKeyword = ref('')
-const currentFileType = ref('')
+const currentFolder = ref(null)
 const currentPreviewFile = ref(null)
 const previewUrl = ref('')
 const total = ref(0)
+const folderDialogTitle = ref('新建文件夹')
+const folderActionType = ref('')
+
+const treeProps = {
+  label: 'folderName',
+  children: 'children'
+}
 
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
   keyword: '',
-  fileType: ''
+  fileType: '',
+  folderId: null
 })
 
+const folderForm = reactive({
+  id: null,
+  folderName: '',
+  parentId: null
+})
+
+const folderRules = {
+  folderName: [
+    { required: true, message: '请输入文件夹名称', trigger: 'blur' }
+  ]
+}
+
 onMounted(() => {
+  loadFolderTree()
   loadFileList()
 })
+
+const loadFolderTree = () => {
+  getFolderTree().then(response => {
+    if (response.code === 200) {
+      folderTree.value = response.data || []
+    }
+  }).catch(() => {})
+}
 
 const loadFileList = () => {
   loading.value = true
   queryParams.keyword = searchKeyword.value
   getFileList(queryParams).then(response => {
     if (response.code === 200) {
-      fileList.value = response.data.records
-      total.value = response.data.total
+      fileList.value = response.data.records || []
+      total.value = response.data.total || 0
     }
     loading.value = false
   }).catch(() => {
     loading.value = false
+  })
+}
+
+const handleFolderClick = (data) => {
+  currentFolder.value = data
+  queryParams.folderId = data.id
+  queryParams.pageNum = 1
+  loadFileList()
+}
+
+const goToRoot = () => {
+  currentFolder.value = null
+  queryParams.folderId = null
+  folderTreeRef.value?.setCurrentKey(null)
+  queryParams.pageNum = 1
+  loadFileList()
+}
+
+const handleCreateFolder = () => {
+  folderActionType.value = 'create'
+  folderDialogTitle.value = '新建文件夹'
+  folderForm.id = null
+  folderForm.folderName = ''
+  folderForm.parentId = currentFolder.value?.id || 0
+  folderDialogVisible.value = true
+}
+
+const handleFolderAction = (command, data) => {
+  if (command === 'create') {
+    folderActionType.value = 'create'
+    folderDialogTitle.value = '新建子文件夹'
+    folderForm.id = null
+    folderForm.folderName = ''
+    folderForm.parentId = data.id
+    folderDialogVisible.value = true
+  } else if (command === 'rename') {
+    folderActionType.value = 'rename'
+    folderDialogTitle.value = '重命名文件夹'
+    folderForm.id = data.id
+    folderForm.folderName = data.folderName
+    folderForm.parentId = data.parentId
+    folderDialogVisible.value = true
+  } else if (command === 'delete') {
+    ElMessageBox.confirm(`确定要删除文件夹"${data.folderName}"吗？此操作会删除所有子文件夹。`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(async () => {
+      try {
+        const response = await deleteFolder(data.id)
+        if (response.code === 200) {
+          ElMessage.success('删除成功')
+          loadFolderTree()
+          if (currentFolder.value?.id === data.id) {
+            goToRoot()
+          }
+        } else {
+          ElMessage.error(response.message || '删除失败')
+        }
+      } catch (error) {
+        ElMessage.error('删除失败')
+      }
+    }).catch(() => {})
+  }
+}
+
+const handleSaveFolder = () => {
+  folderFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        let response
+        if (folderActionType.value === 'create') {
+          response = await createFolder(folderForm)
+        } else {
+          response = await updateFolder(folderForm)
+        }
+        if (response.code === 200) {
+          ElMessage.success(folderActionType.value === 'create' ? '创建成功' : '修改成功')
+          folderDialogVisible.value = false
+          loadFolderTree()
+        } else {
+          ElMessage.error(response.message || '操作失败')
+        }
+      } catch (error) {
+        ElMessage.error('操作失败')
+      }
+    }
   })
 }
 
@@ -231,7 +446,7 @@ const handleUploadClick = () => {
 
 const handleFileChange = (file) => {
   file.percentage = 0
-  file.status = undefined
+  file.status = 'pending'
   fileListToUpload.value.push(file)
 }
 
@@ -249,6 +464,7 @@ const submitUpload = async () => {
   }
 
   uploading.value = true
+  const folderId = currentFolder.value?.id || null
 
   for (let i = 0; i < fileListToUpload.value.length; i++) {
     const file = fileListToUpload.value[i]
@@ -261,9 +477,9 @@ const submitUpload = async () => {
 
       let response
       if (file.size > 10 * 1024 * 1024) {
-        response = await uploadFileAsync(file.raw, onProgress)
+        response = await uploadFileAsync(file.raw, folderId, onProgress)
       } else {
-        response = await uploadFile(file.raw, onProgress)
+        response = await uploadFile(file.raw, folderId, onProgress)
       }
 
       if (response.code === 200) {
@@ -280,10 +496,6 @@ const submitUpload = async () => {
   uploading.value = false
   ElMessage.success('上传任务已完成')
   loadFileList()
-
-  setTimeout(() => {
-    uploadDialogVisible.value = false
-  }, 1000)
 }
 
 const handlePreview = async (file) => {
@@ -319,7 +531,7 @@ const handleDownload = async (file) => {
   }
 }
 
-const handleDelete = (file) => {
+const handleDeleteFile = (file) => {
   ElMessageBox.confirm(`确定要删除文件"${file.originalFilename}"吗？`, '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -339,21 +551,29 @@ const handleDelete = (file) => {
   }).catch(() => {})
 }
 
-const handleTypeChange = () => {
-  queryParams.fileType = currentFileType.value
-  queryParams.pageNum = 1
-  loadFileList()
-}
-
 const getFileIcon = (type) => {
   const iconMap = {
     image: Picture,
     document: Document,
     video: VideoCamera,
-    audio: VideoCamera,
+    audio: Headset,
     other: FolderOpened
   }
   return iconMap[type] || FolderOpened
+}
+
+const getFileIconByName = (filename) => {
+  const ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase()
+  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']
+  const docExts = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf', 'txt']
+  const videoExts = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv']
+  const audioExts = ['mp3', 'wav', 'flac', 'aac']
+
+  if (imageExts.includes(ext)) return Picture
+  if (docExts.includes(ext)) return Document
+  if (videoExts.includes(ext)) return VideoCamera
+  if (audioExts.includes(ext)) return Headset
+  return FolderOpened
 }
 
 const getFileIconColor = (type) => {
@@ -400,6 +620,11 @@ const formatFileSize = (bytes) => {
 
 <style lang="scss" scoped>
 .file-container {
+  .folder-card {
+    height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
+
   .card-header {
     font-weight: 600;
     font-size: 15px;
@@ -408,6 +633,10 @@ const formatFileSize = (bytes) => {
     justify-content: space-between;
     align-items: center;
 
+    .header-left {
+      flex: 1;
+    }
+
     .header-actions {
       display: flex;
       gap: 12px;
@@ -415,8 +644,52 @@ const formatFileSize = (bytes) => {
     }
   }
 
+  .custom-tree-node {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    padding-right: 8px;
+
+    .folder-icon {
+      margin-right: 8px;
+      color: #409eff;
+    }
+
+    .folder-name {
+      flex: 1;
+    }
+
+    .folder-actions {
+      opacity: 0;
+      transition: opacity 0.2s;
+
+      .action-icon {
+        cursor: pointer;
+        color: #909399;
+
+        &:hover {
+          color: #409eff;
+        }
+      }
+    }
+
+    &:hover .folder-actions {
+      opacity: 1;
+    }
+  }
+
   .search-bar {
     margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .file-count {
+      color: #909399;
+      font-size: 13px;
+    }
   }
 
   .file-name-cell {
@@ -432,6 +705,12 @@ const formatFileSize = (bytes) => {
     .file-icon {
       font-size: 18px;
     }
+
+    .file-name-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 
   .pagination {
@@ -440,31 +719,50 @@ const formatFileSize = (bytes) => {
     justify-content: flex-end;
   }
 
-  .file-list {
-    max-height: 300px;
+  .file-list-container {
+    max-height: 400px;
     overflow-y: auto;
     margin-top: 20px;
 
-    .file-item {
-      display: flex;
-      align-items: center;
-      padding: 10px;
+    .upload-file-item {
+      padding: 12px;
       background: #f5f7fa;
-      border-radius: 4px;
+      border-radius: 6px;
       margin-bottom: 10px;
 
-      .file-name {
-        flex: 1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        margin-right: 10px;
+      .file-info {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+
+        .file-icon-small {
+          font-size: 16px;
+          margin-right: 8px;
+          color: #409eff;
+        }
+
+        .file-name {
+          flex: 1;
+          font-size: 14px;
+          color: #303133;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .file-size {
+          color: #909399;
+          font-size: 12px;
+          margin-left: 12px;
+        }
       }
 
-      .file-size {
-        margin-left: 10px;
-        color: #909399;
-        font-size: 12px;
+      .progress-container {
+        width: 100%;
+      }
+
+      .status-container {
+        text-align: right;
       }
     }
   }
