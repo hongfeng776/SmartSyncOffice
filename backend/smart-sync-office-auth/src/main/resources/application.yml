@@ -63,6 +63,102 @@ minio:
   secret-key: minioadmin
   bucket-name: smart-sync-office
 
+file-upload:
+  max-file-size: 524288000
+  allowed-extensions:
+    - jpg
+    - jpeg
+    - png
+    - gif
+    - bmp
+    - webp
+    - svg
+    - doc
+    - docx
+    - xls
+    - xlsx
+    - ppt
+    - pptx
+    - pdf
+    - txt
+    - mp4
+    - avi
+    - mov
+    - wmv
+    - flv
+    - mkv
+    - mp3
+    - wav
+    - flac
+    - aac
+    - zip
+    - rar
+    - 7z
+  forbidden-extensions:
+    - exe
+    - bat
+    - cmd
+    - sh
+    - js
+    - vbs
+    - ps1
+    - jar
+    - class
+    - php
+    - asp
+    - aspx
+    - jsp
+    -jspx
+    - html
+    - htm
+    - mht
+    - mhtml
+    - xhtml
+    - htt
+    - hta
+    - cdr
+    - chm
+    - msi
+    - msp
+    - mst
+    - iso
+    - bin
+    - dll
+    - com
+    - reg
+    - scr
+    - hlp
+    - wsh
+    - wsf
+    - wsc
+    - cpl
+    - ocx
+    - ax
+    - spl
+    - app
+    - application
+    - gadget
+    - msu
+    - msp
+    - mst
+    - pif
+    - scr
+    - url
+    - lnk
+    - scf
+    - inf
+    - ins
+    - inx
+    - isu
+    - isp
+    - ies
+    - ipa
+    - apk
+    - appx
+    - appxbundle
+    - deb
+    - rpm
+
 logging:
   level:
     com.smartsync: debug
