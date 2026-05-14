@@ -71,6 +71,38 @@ const asyncRoutes = [
     ]
   },
   {
+    path: '/approval',
+    component: () => import('@/layout/index.vue'),
+    redirect: '/approval/create',
+    meta: { title: '流程审批', icon: 'Document' },
+    children: [
+      {
+        path: 'create',
+        name: 'ApprovalCreate',
+        component: () => import('@/views/approval/create/index.vue'),
+        meta: { title: '发起审批', icon: 'Plus' }
+      },
+      {
+        path: 'todo',
+        name: 'ApprovalTodo',
+        component: () => import('@/views/approval/todo/index.vue'),
+        meta: { title: '待我审批', icon: 'Clock' }
+      },
+      {
+        path: 'my',
+        name: 'ApprovalMy',
+        component: () => import('@/views/approval/my/index.vue'),
+        meta: { title: '我发起的', icon: 'Tickets' }
+      },
+      {
+        path: 'detail',
+        name: 'ApprovalDetail',
+        component: () => import('@/views/approval/detail/index.vue'),
+        meta: { title: '审批详情', icon: 'View', hidden: true }
+      }
+    ]
+  },
+  {
     path: '/todo',
     component: () => import('@/layout/index.vue'),
     children: [
