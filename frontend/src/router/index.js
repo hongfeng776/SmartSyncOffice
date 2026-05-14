@@ -109,6 +109,38 @@ const asyncRoutes = [
     ]
   },
   {
+    path: '/task',
+    component: () => import('@/layout/index.vue'),
+    redirect: '/task/create',
+    meta: { title: '任务管理', icon: 'List' },
+    children: [
+      {
+        path: 'create',
+        name: 'TaskCreate',
+        component: () => import('@/views/task/create/index.vue'),
+        meta: { title: '发布任务', icon: 'Plus' }
+      },
+      {
+        path: 'my',
+        name: 'TaskMy',
+        component: () => import('@/views/task/my/index.vue'),
+        meta: { title: '我的任务', icon: 'Tickets' }
+      },
+      {
+        path: 'progress',
+        name: 'TaskProgress',
+        component: () => import('@/views/task/progress/index.vue'),
+        meta: { title: '任务进度', icon: 'DataLine' }
+      },
+      {
+        path: 'detail',
+        name: 'TaskDetail',
+        component: () => import('@/views/task/detail/index.vue'),
+        meta: { title: '任务详情', icon: 'View', hidden: true }
+      }
+    ]
+  },
+  {
     path: '/notification',
     component: () => import('@/layout/index.vue'),
     children: [
