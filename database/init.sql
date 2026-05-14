@@ -82,13 +82,16 @@ INSERT INTO sys_role (id, role_name, role_code, description) VALUES
 -- 权限
 INSERT INTO sys_permission (id, permission_name, permission_code, resource_type, parent_id, path, component, icon, sort_order) VALUES
 (1, '系统首页', 'dashboard', 'menu', 0, '/dashboard', 'dashboard/index', 'HomeFilled', 1),
-(2, '系统管理', 'system', 'menu', 0, '/system', '', 'Setting', 2),
-(3, '用户管理', 'system:user', 'menu', 2, '/system/user', 'system/user/index', 'User', 1),
-(4, '角色管理', 'system:role', 'menu', 2, '/system/role', 'system/role/index', 'UserFilled', 2),
-(5, '权限管理', 'system:permission', 'menu', 2, '/system/permission', 'system/permission/index', 'Lock', 3),
-(6, '个人中心', 'profile', 'menu', 0, '/profile', 'profile/index', 'User', 99),
-(7, '待办事项', 'todo', 'menu', 0, '/todo', 'todo/index', 'TodoList', 3),
-(8, '文件管理', 'file', 'menu', 0, '/file', 'file/index', 'Folder', 4);
+(2, '组织架构', 'org', 'menu', 0, '/org', '', 'OfficeBuilding', 2),
+(3, '部门管理', 'org:dept', 'menu', 2, '/org/dept', 'org/dept/index', 'Menu', 1),
+(4, '员工列表', 'org:employee', 'menu', 2, '/org/employee', 'org/employee/index', 'User', 2),
+(5, '系统管理', 'system', 'menu', 0, '/system', '', 'Setting', 3),
+(6, '用户管理', 'system:user', 'menu', 5, '/system/user', 'system/user/index', 'User', 1),
+(7, '角色管理', 'system:role', 'menu', 5, '/system/role', 'system/role/index', 'UserFilled', 2),
+(8, '权限管理', 'system:permission', 'menu', 5, '/system/permission', 'system/permission/index', 'Lock', 3),
+(9, '个人中心', 'profile', 'menu', 0, '/profile', 'profile/index', 'User', 99),
+(10, '待办事项', 'todo', 'menu', 0, '/todo', 'todo/index', 'TodoList', 4),
+(11, '文件管理', 'file', 'menu', 0, '/file', 'file/index', 'Folder', 5);
 
 -- 默认用户 (启动后端时会自动创建并设置密码为 123456)
 INSERT INTO sys_user (id, username, password, real_name, email, phone) VALUES
@@ -102,8 +105,8 @@ INSERT INTO sys_user_role (user_id, role_id) VALUES
 
 -- 角色权限关联 (管理员拥有所有权限)
 INSERT INTO sys_role_permission (role_id, permission_id) VALUES
-(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8),
-(2, 1), (2, 6), (2, 7), (2, 8);
+(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11),
+(2, 1), (2, 9), (2, 10), (2, 11);
 
 -- 登录日志表
 DROP TABLE IF EXISTS sys_login_log;

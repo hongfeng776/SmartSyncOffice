@@ -25,6 +25,26 @@ const constantRoutes = [
 
 const asyncRoutes = [
   {
+    path: '/org',
+    component: () => import('@/layout/index.vue'),
+    redirect: '/org/dept',
+    meta: { title: '组织架构', icon: 'OfficeBuilding', roles: ['ADMIN'] },
+    children: [
+      {
+        path: 'dept',
+        name: 'OrgDept',
+        component: () => import('@/views/org/dept/index.vue'),
+        meta: { title: '部门管理', icon: 'Menu', roles: ['ADMIN'] }
+      },
+      {
+        path: 'employee',
+        name: 'OrgEmployee',
+        component: () => import('@/views/org/employee/index.vue'),
+        meta: { title: '员工列表', icon: 'User', roles: ['ADMIN'] }
+      }
+    ]
+  },
+  {
     path: '/system',
     component: () => import('@/layout/index.vue'),
     redirect: '/system/user',

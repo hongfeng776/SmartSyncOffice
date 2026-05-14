@@ -312,6 +312,38 @@ public class AuthService {
         constantMenus.add(dashboard);
         
         List<Map<String, Object>> adminMenus = new ArrayList<>();
+        if (permissionCodes.contains("org")) {
+            Map<String, Object> orgMenu = new HashMap<>();
+            orgMenu.put("path", "/org");
+            orgMenu.put("name", "Org");
+            Map<String, Object> orgMeta = new HashMap<>();
+            orgMeta.put("title", "组织架构");
+            orgMeta.put("icon", "OfficeBuilding");
+            orgMenu.put("meta", orgMeta);
+            
+            List<Map<String, Object>> orgChildren = new ArrayList<>();
+            if (permissionCodes.contains("org:dept")) {
+                Map<String, Object> deptMenu = new HashMap<>();
+                deptMenu.put("path", "/org/dept");
+                Map<String, Object> deptMeta = new HashMap<>();
+                deptMeta.put("title", "部门管理");
+                deptMeta.put("icon", "Menu");
+                deptMenu.put("meta", deptMeta);
+                orgChildren.add(deptMenu);
+            }
+            if (permissionCodes.contains("org:employee")) {
+                Map<String, Object> employeeMenu = new HashMap<>();
+                employeeMenu.put("path", "/org/employee");
+                Map<String, Object> employeeMeta = new HashMap<>();
+                employeeMeta.put("title", "员工列表");
+                employeeMeta.put("icon", "User");
+                employeeMenu.put("meta", employeeMeta);
+                orgChildren.add(employeeMenu);
+            }
+            orgMenu.put("children", orgChildren);
+            adminMenus.add(orgMenu);
+        }
+        
         if (permissionCodes.contains("system")) {
             Map<String, Object> systemMenu = new HashMap<>();
             systemMenu.put("path", "/system");
