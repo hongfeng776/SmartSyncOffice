@@ -223,20 +223,34 @@
             :src="previewUrl"
             class="preview-image"
             alt="预览"
+            @load="previewLoading = false"
+            @error="previewLoading = false"
           />
           <video
             v-else-if="currentPreviewFile.fileType === 'video'"
             :src="previewUrl"
             class="preview-video"
             controls
+            preload="metadata"
           >
             您的浏览器不支持视频播放
           </video>
-          <iframe
-            v-else-if="currentPreviewFile.fileType === 'document'"
-            :src="previewUrl"
-            class="preview-document"
-          />
+          <template v-else-if="currentPreviewFile.fileType === 'document'">
+            <iframe
+              v-if="currentPreviewFile.fileExtension === 'pdf'"
+              :src="previewUrl + '#toolbar=1&navpanes=0&scrollbar=1'"
+              class="preview-document"
+              @load="previewLoading = false"
+              @error="previewLoading = false"
+            />
+            <div v-else class="preview-unsupported">
+              <el-icon size="60" color="#909399"><Document /></el-icon>
+              <p>该文档类型暂不支持在线预览，请下载后查看</p>
+              <el-button type="primary" @click="handleDownload(currentPreviewFile)">
+                下载文件
+              </el-button>
+            </div>
+          </template>
           <div v-else class="preview-unsupported">
             <el-icon size="60" color="#909399"><Document /></el-icon>
             <p>该文件类型暂不支持在线预览，请下载后查看</p>
@@ -277,7 +291,10 @@ import {
   getFolderTree,
   createFolder,
   updateFolder,
-  deleteFolder
+  deleteFolder,
+  checkChunk,
+  uploadChunk,
+  mergeChunks
 } from '@/api/file'
 
 const uploadRef = ref(null)
@@ -465,37 +482,78 @@ const submitUpload = async () => {
 
   uploading.value = true
   const folderId = currentFolder.value?.id || null
+  const CHUNK_SIZE = 5 * 1024 * 1024
 
   for (let i = 0; i < fileListToUpload.value.length; i++) {
-    const file = fileListToUpload.value[i]
+    const fileItem = fileListToUpload.value[i]
+    const file = fileItem.raw
+
     try {
-      const onProgress = (event) => {
-        if (event.total > 0) {
-          file.percentage = Math.round((event.loaded * 100) / event.total)
+      if (file.size > 10 * 1024 * 1024) {
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+        
+        let uploadId = ''
+        const checkResponse = await checkChunk('', file.name, file.size, folderId)
+        if (checkResponse.code === 200) {
+          uploadId = checkResponse.data.uploadId
+        }
+
+        let uploadedCount = 0
+        for (let chunkIndex = 1; chunkIndex <= totalChunks; chunkIndex++) {
+          const start = (chunkIndex - 1) * CHUNK_SIZE
+          const end = Math.min(chunkIndex * CHUNK_SIZE, file.size)
+          const chunk = file.slice(start, end)
+
+          const formData = new FormData()
+          formData.append('file', chunk)
+          formData.append('uploadId', uploadId)
+          formData.append('chunkNumber', chunkIndex)
+          formData.append('totalChunks', totalChunks)
+          formData.append('totalSize', file.size)
+          formData.append('filename', file.name)
+          if (folderId) {
+            formData.append('folderId', folderId)
+          }
+
+          await uploadChunk(formData)
+          uploadedCount++
+          fileItem.percentage = Math.round((uploadedCount * 100) / totalChunks)
+        }
+
+        const mergeResponse = await mergeChunks(uploadId)
+        if (mergeResponse.code === 200) {
+          fileItem.percentage = 100
+          fileItem.status = 'success'
+        } else {
+          fileItem.status = 'exception'
+        }
+      } else {
+        const onProgress = (event) => {
+          if (event.total > 0) {
+            fileItem.percentage = Math.round((event.loaded * 100) / event.total)
+          }
+        }
+        const response = await uploadFile(file, folderId, onProgress)
+        if (response.code === 200) {
+          fileItem.percentage = 100
+          fileItem.status = 'success'
+        } else {
+          fileItem.status = 'exception'
         }
       }
-
-      let response
-      if (file.size > 10 * 1024 * 1024) {
-        response = await uploadFileAsync(file.raw, folderId, onProgress)
-      } else {
-        response = await uploadFile(file.raw, folderId, onProgress)
-      }
-
-      if (response.code === 200) {
-        file.percentage = 100
-        file.status = 'success'
-      } else {
-        file.status = 'exception'
-      }
     } catch (error) {
-      file.status = 'exception'
+      console.error('上传失败:', error)
+      fileItem.status = 'exception'
     }
   }
 
   uploading.value = false
   ElMessage.success('上传任务已完成')
   loadFileList()
+
+  setTimeout(() => {
+    uploadDialogVisible.value = false
+  }, 1000)
 }
 
 const handlePreview = async (file) => {
@@ -504,10 +562,7 @@ const handlePreview = async (file) => {
   previewLoading.value = true
 
   try {
-    const response = await getFilePreviewUrl(file.id)
-    if (response.code === 200) {
-      previewUrl.value = response.data
-    }
+    previewUrl.value = `/auth/file/stream/${file.id}`
   } catch (error) {
     console.error('获取预览地址失败', error)
   } finally {
