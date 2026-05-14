@@ -101,9 +101,9 @@ async function handleCommand(command) {
 }
 
 onMounted(() => {
-  notificationStore.fetchUnreadCount()
+  notificationStore.fetchUnreadCountByType()
   refreshInterval = setInterval(() => {
-    notificationStore.fetchUnreadCount()
+    notificationStore.fetchUnreadCountByType()
   }, 30000)
 })
 
