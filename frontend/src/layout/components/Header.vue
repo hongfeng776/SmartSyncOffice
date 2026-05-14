@@ -17,6 +17,12 @@
       </el-breadcrumb>
     </div>
     <div class="right">
+      <div class="notification-icon" @click="goToNotification">
+        <el-badge :value="notificationStore.unreadCount" :hidden="notificationStore.unreadCount === 0" class="item">
+          <el-icon class="bell-icon"><Bell /></el-icon>
+        </el-badge>
+      </div>
+
       <el-dropdown @command="handleCommand">
         <div class="user-info">
           <el-avatar :size="32">
@@ -27,6 +33,11 @@
         </div>
         <template #dropdown>
           <el-dropdown-menu>
+            <el-dropdown-item command="notification">
+              <el-icon><Bell /></el-icon>
+              <span>消息中心</span>
+              <el-tag v-if="notificationStore.unreadCount > 0" type="danger" size="small">{{ notificationStore.unreadCount }}</el-tag>
+            </el-dropdown-item>
             <el-dropdown-item command="profile">
               <el-icon><User /></el-icon>
               <span>个人中心</span>
@@ -43,20 +54,29 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import { Bell, Fold, Expand, User, CaretBottom, SwitchButton } from '@element-plus/icons-vue'
 import { useAppStore } from '@/store/modules/app'
 import { useUserStore } from '@/store/modules/user'
+import { useNotificationStore } from '@/store/modules/notification'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const notificationStore = useNotificationStore()
+
+let refreshInterval = null
 
 const breadcrumbs = computed(() => {
   return route.matched.filter(item => item.meta && item.meta.title)
 })
+
+function goToNotification() {
+  router.push('/notification')
+}
 
 async function handleCommand(command) {
   if (command === 'logout') {
@@ -66,14 +86,32 @@ async function handleCommand(command) {
         cancelButtonText: '取消',
         type: 'warning'
       })
+      if (refreshInterval) {
+        clearInterval(refreshInterval)
+      }
       await userStore.logout()
       router.push('/login')
     } catch {
     }
   } else if (command === 'profile') {
     router.push('/profile')
+  } else if (command === 'notification') {
+    router.push('/notification')
   }
 }
+
+onMounted(() => {
+  notificationStore.fetchUnreadCount()
+  refreshInterval = setInterval(() => {
+    notificationStore.fetchUnreadCount()
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -101,6 +139,27 @@ async function handleCommand(command) {
 }
 
 .right {
+  display: flex;
+  align-items: center;
+
+  .notification-icon {
+    cursor: pointer;
+    padding: 0 15px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background-color: #f5f7fa;
+    }
+
+    .bell-icon {
+      font-size: 20px;
+      color: #606266;
+    }
+  }
+
   .user-info {
     display: flex;
     align-items: center;

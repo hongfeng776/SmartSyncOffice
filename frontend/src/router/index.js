@@ -67,6 +67,12 @@ const asyncRoutes = [
         name: 'SystemPermission',
         component: () => import('@/views/system/permission/index.vue'),
         meta: { title: '权限管理', icon: 'Lock', roles: ['ADMIN'] }
+      },
+      {
+        path: 'announcement',
+        name: 'SystemAnnouncement',
+        component: () => import('@/views/system/announcement/index.vue'),
+        meta: { title: '公告管理', icon: 'Bell', roles: ['ADMIN'] }
       }
     ]
   },
