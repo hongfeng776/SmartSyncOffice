@@ -34,6 +34,10 @@ spring:
           enabled: true
           max-attempts: 3
           initial-interval: 1000
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
 
 jwt:
   secret: SmartSyncOfficeSecretKeyForJwtTokenGenerationMustBeLongEnough256Bits
@@ -52,6 +56,12 @@ mybatis-plus:
       logic-delete-field: isDeleted
       logic-delete-value: 1
       logic-not-delete-value: 0
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: smart-sync-office
 
 logging:
   level:
